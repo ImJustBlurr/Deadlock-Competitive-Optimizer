@@ -1,0 +1,41 @@
+// Cloth physics ON (fixes playermodel bugs)
+"cloth_update" "1"
+"cloth_sim_on_tick" "1"
+
+// Particle optimizations – keeps them visible but cheaper
+"r_particle_max_texture_layers" "4"
+"r_particle_max_detail_level" "2"
+"r_particle_cables_cast_shadows" "0"
+
+// Hair shading off (barely noticeable, good FPS save)
+"r_hair_ao" "0"
+
+// Grass optimizations – keeps grass but cheap
+"r_grass_quality" "0"
+"r_grass_start_fade" "0"
+"r_grass_end_fade" "0"
+
+// Decals – keep minimal but visible
+"r_character_decal_resolution" "1"
+"r_drawmodeldecals" "0"
+
+// Fog – disables expensive volumetric fog
+"r_citadel_fog_quality" "0"
+"r_enable_volume_fog" "0"
+"r_enable_gradient_fog" "0"
+"r_enable_cubemap_fog" "0"
+
+// Shadows – off for max FPS, models still readable
+"r_citadel_shadow_quality" "0"
+"r_shadows" "0"
+"r_particle_shadows" "0"
+
+// Screen effects off for clarity
+"r_ssao" "0"
+"r_effects_bloom" "0"
+"r_post_bloom" "0"
+"r_citadel_motion_blur" "0"
+
+// Visibility improvements
+"r_distancefield_enable" "1"
+"r_citadel_outlines" "1"
