@@ -1,9 +1,6 @@
 import os
 import stat
 
-def log_error(e):
-    print(f"{type(e).__name__} at line {e.__traceback__.tb_lineno} of {__file__}: {e}")
-
 def is_file_readonly(path):
     return not os.access(path, os.W_OK)
 

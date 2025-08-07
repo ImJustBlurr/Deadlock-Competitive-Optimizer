@@ -1,11 +1,19 @@
 import sys
 import re
+import logging
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QCheckBox, QComboBox, QPushButton, QMessageBox, QFormLayout, QFileDialog
 )
 from PyQt6.QtCore import Qt
-from utils import log_error, set_file_readonly, is_file_readonly
+from utils import set_file_readonly, is_file_readonly
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="{asctime} - {levelname} - {message}",
+    style="{",
+    datefmt="%Y-%m-%d %H:%M",
+)
 
 class DeadlockCompetitiveOptimizer(QWidget):
     def __init__(self):
@@ -127,7 +135,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
                 "texture_quality": texture_quality_map[self.textureQuality.currentText()]
             }
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
             self.show_error_popup(message="Cannot save settings. Ensure you have entered the correct information.")
             return False
 
@@ -161,11 +169,11 @@ class DeadlockCompetitiveOptimizer(QWidget):
         try:
             self.settings["device_id"], self.settings["vendor_id"] = self.get_vendor_device_ids(video_txt_path)
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
             self.show_error_popup(message=f"Failed to get your Vendor/Device ID's from {video_txt_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
             return False
         else:
-            print(f"Retrieved Vendor/Device ID's from {video_txt_path}")
+            logging.info(f"Retrieved Vendor/Device ID's from {video_txt_path}")
 
         # generate modified video.txt file
         try:
@@ -173,11 +181,11 @@ class DeadlockCompetitiveOptimizer(QWidget):
                 template = f.read()
                 video_txt_contents = template.format(**self.settings)
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
             self.show_error_popup(message=f"Failed to generate new video.txt file. Ensure you have entered the correct information.")
             return False
         else:
-            print("Successfully generated new video.txt file.")
+            logging.info("Successfully generated new video.txt file.")
 
         # write the new video.txt file
         try:
@@ -192,17 +200,18 @@ class DeadlockCompetitiveOptimizer(QWidget):
                     return False
                 else:
                     set_file_readonly(video_txt_path, readonly=False)
+                    
 
-            with open(video_txt_path, "r+") as f:
+            with open(video_txt_path, "w") as f:
                 f.seek(0)
                 f.write(video_txt_contents)
                 f.truncate()
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
             self.show_error_popup(message=f"Failed to write to {video_txt_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
             return False
         else:
-            print(f"Successfully optimized {video_txt_path}")
+            logging.info(f"Successfully optimized {video_txt_path}")
 
         # handle bak file
         try:
@@ -213,14 +222,14 @@ class DeadlockCompetitiveOptimizer(QWidget):
                 f.truncate()
             set_file_readonly(f"{video_txt_path}.bak")
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
 
         # set file to readonly
         try:
             if self.readOnly.isChecked():
                 set_file_readonly(video_txt_path, True)
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
             self.show_error_popup(message=f"Failed to set {video_txt_path} to read-only. Ensure you have the correct path, the correct permissions, and have launched Deadlock prior to optimizing.")
 
         return True
@@ -238,22 +247,22 @@ class DeadlockCompetitiveOptimizer(QWidget):
                 temp_autoexec_cfg_contents = f.read()
                 autoexec_cfg_contents = temp_autoexec_cfg_contents.format(desired_fps=self.settings["desired_fps"])
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
             self.show_error_popup(message=f"Failed to get autoexec config from configs/autoexec.txt. Ensure your exe/.py file is in the same directory as the configs folder.")
             return False
         else:
-            print("Successfully retrieved autoexec config data.")
+            logging.info("Successfully retrieved autoexec config data.")
 
         # write to autoexec.cfg; create it if it does not exist
         try:
             with open(autoexec_cfg_path, "w") as f:
                 f.write(autoexec_cfg_contents)
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
             self.show_error_popup(message=f"Failed to write to {autoexec_cfg_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
             return False
         else:
-            print(f"Successfully optimized {autoexec_cfg_path}")
+            logging.info(f"Successfully optimized {autoexec_cfg_path}")
 
         return True
 
@@ -269,24 +278,24 @@ class DeadlockCompetitiveOptimizer(QWidget):
             with open("configs/gameinfo.txt", "r") as f:
                 gameinfo_gi_contents = f.read()
         except Exception as e:
-            log_error
+            logging.error
             self.show_error_popup(message=f"Failed to get gameinfo config from configs/gameinfo.txt. Ensure your exe/.py file is in the same directory as the configs folder.")
             return False
         else:
-            print("Successfully retrieved gameinfo config data.")
+            logging.info("Successfully retrieved gameinfo config data.")
 
         # get gameinfo existing content
         try:
             with open(gameinfo_gi_path, "r") as f:
                 lines = f.readlines()
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
             self.show_error_popup(message=f"Failed to write to {gameinfo_gi_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
             return False
 
         # see if gameinfo is modified already
         if gameinfo_gi_contents.strip() in "".join(lines):
-            print("Gameinfo optimization already exists. Skipping insertion.")
+            logging.info("Gameinfo optimization already exists. Skipping insertion.")
             return True
 
         output_lines = []
@@ -310,11 +319,11 @@ class DeadlockCompetitiveOptimizer(QWidget):
             with open(gameinfo_gi_path, "w") as f:
                 f.writelines(output_lines)
         except Exception as e:
-            log_error(e)
+            logging.error(str(e))
             self.show_error_popup(message=f"Failed to write to {gameinfo_gi_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
             return False
         else:
-            print(f"Successfully optimized {gameinfo_gi_path}")
+            logging.info(f"Successfully optimized {gameinfo_gi_path}")
 
         return True
 
