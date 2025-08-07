@@ -1,25 +1,11 @@
 import sys
-import traceback
 import re
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QCheckBox, QComboBox, QPushButton, QMessageBox, QFormLayout, QFileDialog
 )
 from PyQt6.QtCore import Qt
-
-# helpers
-def get_vendor_device_ids(filepath):
-    vendor_id = None
-    device_id = None
-
-    with open(filepath, "r") as f:
-        for line in f:
-            if "VendorID" in line:
-                vendor_id = re.search(r'\d+', line).group()
-            elif "DeviceID" in line:
-                device_id = re.search(r'\d+', line).group()
-    
-    return vendor_id, device_id
+from utils import log_error, set_file_readonly, is_file_readonly
 
 class DeadlockCompetitiveOptimizer(QWidget):
     def __init__(self):
@@ -76,9 +62,13 @@ class DeadlockCompetitiveOptimizer(QWidget):
         self.textureQuality.addItems(["Balanced (Recommended)", "Performance", "Quality"])
         form_layout.addRow("Texture Quality:", self.textureQuality)
 
+        # Read Only
+        self.readOnly = QCheckBox("Make video.txt read-only to fully save these settings")
+        form_layout.addRow(self.readOnly)
+
         main_layout.addLayout(form_layout)
 
-        # Save Button Aligned Bottom Right
+        # Optimize
         button_row = QHBoxLayout()
         button_row.addStretch()
         save_button = QPushButton("Optimize")
@@ -92,7 +82,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Icon.Critical)
         msg.setWindowTitle(title)
-        msg.setText(message)
+        msg.setText(f"{message} See console for more information.")
         msg.exec()
 
     def show_success_popup(self, title="Success", message="Operation completed successfully."):
@@ -107,7 +97,8 @@ class DeadlockCompetitiveOptimizer(QWidget):
         if folder:
             self.path_input.setText(folder)
 
-    def save_settings(self):
+    def save_settings(self) -> bool:
+        """Saves all user entered information to the optimizer"""
         display_mode_map = {
             "Borderless": 0,
             "Fullscreen": 1
@@ -119,84 +110,162 @@ class DeadlockCompetitiveOptimizer(QWidget):
             "Quality": 0
         }
 
-        self.settings = {
-            "resolution_width": int(self.resolutionWidth.text()),
-            "resolution_height": int(self.resolutionHeight.text()),
-            "refresh_rate": int(self.refreshRate.text()),
-            "desired_fps": int(self.fps.text()),
-            "display_mode": display_mode_map[self.displayMode.currentText()],
-            "texture_quality": texture_quality_map[self.textureQuality.currentText()]
-        }
-    
-    def write_video(self, path):
-        video_txt_path = f"{path}/game/citadel/cfg/video.txt"
-        self.settings["device_id"], self.settings["vendor_id"] = get_vendor_device_ids(video_txt_path)
+        try:
+            self.settings = {
+                "resolution_width": int(self.resolutionWidth.text()),
+                "resolution_height": int(self.resolutionHeight.text()),
+                "refresh_rate": int(self.refreshRate.text()),
+                "desired_fps": int(self.fps.text()),
+                "display_mode": display_mode_map[self.displayMode.currentText()],
+                "texture_quality": texture_quality_map[self.textureQuality.currentText()]
+            }
+        except Exception as e:
+            log_error(e)
+            self.show_error_popup(message="Cannot save settings. Ensure you have entered the correct information.")
+            return False
 
-        print("Generating new video.txt file...")
+        return True
+
+    def get_vendor_device_ids(self, video_txt):
+        """Returns vendor_id, device_id grabbed from video.txt file"""
+        vendor_id = None
+        device_id = None
+
+        with open(video_txt, "r") as f:
+            for line in f:
+                if "VendorID" in line:
+                    vendor_id = re.search(r'\d+', line).group() # grab the numeric characters in that line
+                elif "DeviceID" in line:
+                    device_id = re.search(r'\d+', line).group() # grab the numeric characters in that line
+        
+        return vendor_id, device_id
+    
+    def write_video(self, path) -> bool:
+        video_txt_path = f"{path}/game/citadel/cfg/video.txt"
+
+        # get id's
+        try:
+            self.settings["device_id"], self.settings["vendor_id"] = self.get_vendor_device_ids(video_txt_path)
+        except Exception as e:
+            log_error(e)
+            self.show_error_popup(message=f"Failed to get your Vendor/Device ID's from {video_txt_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
+            return False
+        else:
+            print(f"Retrieved Vendor/Device ID's from {video_txt_path}")
+
+        # generate modified video.txt file
         try:
             with open("configs/video.txt", "r") as f:
                 template = f.read()
                 video_txt_contents = template.format(**self.settings)
         except Exception as e:
-            print("Generating failed:", e)
-            self.show_error_popup(message=e)
-            # return
-        print("Successfully generated new video.txt file.")
+            log_error(e)
+            self.show_error_popup(message=f"Failed to generate new video.txt file. Ensure you have entered the correct information.")
+            return False
+        else:
+            print("Successfully generated new video.txt file.")
 
-        print("Writing to video.txt...")
+        # write the new video.txt file
         try:
+            if is_file_readonly(video_txt_path):
+                response = QMessageBox.question(
+                    self,
+                    "File is Read-Only",
+                    f"{video_txt_path} is currently read-only. Do you want to make it writable to overwrite it?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if response == QMessageBox.StandardButton.No:
+                    return False
+                else:
+                    set_file_readonly(video_txt_path, readonly=False)
+
             with open(video_txt_path, "r+") as f:
                 f.seek(0)
                 f.write(video_txt_contents)
                 f.truncate()
         except Exception as e:
-            print("Writing failed:", e)
-            self.show_error_popup(message=e)
-            # return
-        print("Successfully wrote new video.txt file.")
+            log_error(e)
+            self.show_error_popup(message=f"Failed to write to {video_txt_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
+            return False
+        else:
+            print(f"Successfully optimized {video_txt_path}")
 
-    def write_autoexec(self, path):
+        # handle bak file
+        try:
+            set_file_readonly(f"{video_txt_path}.bak", readonly=False)
+            with open(f"{video_txt_path}.bak", "w") as f:
+                f.seek(0)
+                f.write(video_txt_contents)
+                f.truncate()
+            set_file_readonly(f"{video_txt_path}.bak")
+        except Exception as e:
+            log_error(e)
+
+        # set file to readonly
+        try:
+            if self.readOnly.isChecked():
+                set_file_readonly(video_txt_path, True)
+        except Exception as e:
+            log_error(e)
+            self.show_error_popup(message=f"Failed to set {video_txt_path} to read-only. Ensure you have the correct path, the correct permissions, and have launched Deadlock prior to optimizing.")
+
+        return True
+
+    def write_autoexec(self, path) -> bool:
         autoexec_cfg_path = f"{path}/game/citadel/cfg/autoexec.cfg"
 
-        print("Reading autoexec.txt file...")
+        # get autoexec content
         try:
             with open("configs/autoexec.txt", "r") as f:
-                autoexec_cfg_contents = f.read()
+                temp_autoexec_cfg_contents = f.read()
+                autoexec_cfg_contents = temp_autoexec_cfg_contents.format(desired_fps=self.settings["desired_fps"])
         except Exception as e:
-            print("Reading failed:", e)
-            self.show_error_popup(message=e)
-            # return
-        print("Successfully read autoexec.txt file.")
+            log_error(e)
+            self.show_error_popup(message=f"Failed to get autoexec config from configs/autoexec.txt. Ensure your exe/.py file is in the same directory as the configs folder.")
+            return False
+        else:
+            print("Successfully retrieved autoexec config data.")
 
-        print("Writing to autoexec.cfg...")
+        # write to autoexec.cfg; create it if it does not exist
         try:
             with open(autoexec_cfg_path, "w") as f:
                 f.write(autoexec_cfg_contents)
         except Exception as e:
-            print("Writing failed:", e)
-            self.show_error_popup(message=e)
-            # return
-        print("Successfully wrote new autoexec.cfg file.")
+            log_error(e)
+            self.show_error_popup(message=f"Failed to write to {autoexec_cfg_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
+            return False
+        else:
+            print(f"Successfully optimized {autoexec_cfg_path}")
+
+        return True
 
     def write_gameinfo(self, path):
         gameinfo_gi_path = f"{path}/game/citadel/gameinfo.gi"
 
-        print("Reading gameinfo.txt file...")
+        # get gameinfo modification content
         try:
             with open("configs/gameinfo.txt", "r") as f:
                 gameinfo_gi_contents = f.read()
         except Exception as e:
-            print("Reading failed:", e)
-            self.show_error_popup(message=e)
-            # return
-        print("Successfully read gameinfo.txt file.")
+            log_error
+            self.show_error_popup(message=f"Failed to get gameinfo config from configs/gameinfo.txt. Ensure your exe/.py file is in the same directory as the configs folder.")
+            return False
+        else:
+            print("Successfully retrieved gameinfo config data.")
 
-        with open(gameinfo_gi_path, "r") as f:
-            lines = f.readlines()
+        # get gameinfo existing content
+        try:
+            with open(gameinfo_gi_path, "r") as f:
+                lines = f.readlines()
+        except Exception as e:
+            log_error(e)
+            self.show_error_popup(message=f"Failed to write to {gameinfo_gi_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
+            return False
 
+        # see if gameinfo is modified already
         if gameinfo_gi_contents.strip() in "".join(lines):
             print("Gameinfo optimization already exists. Skipping insertion.")
-            return
+            return True
 
         output_lines = []
         inserted = False
@@ -214,22 +283,26 @@ class DeadlockCompetitiveOptimizer(QWidget):
 
             i += 1
 
-        print("Writing to gameinfo.gi...")
+        # writing to gameinfo
         try:
             with open(gameinfo_gi_path, "w") as f:
                 f.writelines(output_lines)
         except Exception as e:
-            print("Writing failed:", e)
-            self.show_error_popup(message=e)
-            # return
-        print("Successfully wrote new gameinfo.gi file.")
+            log_error(e)
+            self.show_error_popup(message=f"Failed to write to {gameinfo_gi_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
+            return False
+        else:
+            print(f"Successfully optimized {gameinfo_gi_path}")
+
+        return True
 
     def optimize(self):
         path = self.path_input.text()
-        self.save_settings()
-        self.write_video(path)
-        self.write_autoexec(path)
-        self.write_gameinfo(path)
+
+        if not self.save_settings(): return
+        if not self.write_video(path): return
+        if not self.write_autoexec(path): return
+        if not self.write_gameinfo(path): return
         self.show_success_popup(message="Successfully optimized your game!")
 
 if __name__ == "__main__":
