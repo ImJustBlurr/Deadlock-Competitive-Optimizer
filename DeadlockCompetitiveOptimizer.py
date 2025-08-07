@@ -16,6 +16,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
         self.init_ui()
 
     def init_ui(self):
+        """Initialize UI Elements"""
         main_layout = QVBoxLayout()
 
         form_layout = QFormLayout()
@@ -68,7 +69,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
 
         main_layout.addLayout(form_layout)
 
-        # Optimize
+        # Optimize Button
         button_row = QHBoxLayout()
         button_row.addStretch()
         save_button = QPushButton("Optimize")
@@ -79,6 +80,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
         self.setLayout(main_layout)
 
     def show_error_popup(self, title="Error", message="An error occurred."):
+        """Display an error message to the user"""
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Icon.Critical)
         msg.setWindowTitle(title)
@@ -86,6 +88,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
         msg.exec()
 
     def show_success_popup(self, title="Success", message="Operation completed successfully."):
+        """Display a success message to the user"""
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Icon.Information)
         msg.setWindowTitle(title)
@@ -93,12 +96,16 @@ class DeadlockCompetitiveOptimizer(QWidget):
         msg.exec()
 
     def browse_path(self):
+        """Handle file browsing operation"""
         folder = QFileDialog.getExistingDirectory(self, "Select Deadlock Folder")
         if folder:
             self.path_input.setText(folder)
 
     def save_settings(self) -> bool:
-        """Saves all user entered information to the optimizer"""
+        """
+        Saves all user entered information to the optimizer
+        Returns false if save operation failed
+        """
         display_mode_map = {
             "Borderless": 0,
             "Fullscreen": 1
@@ -127,7 +134,10 @@ class DeadlockCompetitiveOptimizer(QWidget):
         return True
 
     def get_vendor_device_ids(self, video_txt):
-        """Returns vendor_id, device_id grabbed from video.txt file"""
+        """
+        Gets Vendor/Device ID's from video.txt file
+        Returns vendor_id, device_id grabbed from video.txt file
+        """
         vendor_id = None
         device_id = None
 
@@ -141,6 +151,10 @@ class DeadlockCompetitiveOptimizer(QWidget):
         return vendor_id, device_id
     
     def write_video(self, path) -> bool:
+        """
+        Optimized the video.txt file
+        Returns false if writing the optimization failed
+        """
         video_txt_path = f"{path}/game/citadel/cfg/video.txt"
 
         # get id's
@@ -212,6 +226,10 @@ class DeadlockCompetitiveOptimizer(QWidget):
         return True
 
     def write_autoexec(self, path) -> bool:
+        """
+        Optimized the autoexec.cfg file
+        Returns false if writing the optimization failed
+        """
         autoexec_cfg_path = f"{path}/game/citadel/cfg/autoexec.cfg"
 
         # get autoexec content
@@ -240,6 +258,10 @@ class DeadlockCompetitiveOptimizer(QWidget):
         return True
 
     def write_gameinfo(self, path):
+        """
+        Optimized the gameinfo.gi file
+        Returns false if writing the optimization failed
+        """
         gameinfo_gi_path = f"{path}/game/citadel/gameinfo.gi"
 
         # get gameinfo modification content
@@ -297,6 +319,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
         return True
 
     def optimize(self):
+        """Main function to handle all optimization operations"""
         path = self.path_input.text()
 
         if not self.save_settings(): return
