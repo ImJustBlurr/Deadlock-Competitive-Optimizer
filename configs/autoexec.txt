@@ -31,3 +31,4 @@ rate 786432
 cl_interp 0
 cl_interp_ratio 1
 cl_predict 1
+fps_max {desired_fps}
