@@ -1,4 +1,6 @@
 import sys
+import os
+import shutil
 import re
 import logging
 from PyQt6.QtWidgets import (
@@ -6,7 +8,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QPushButton, QMessageBox, QFormLayout, QFileDialog
 )
 from PyQt6.QtCore import Qt
-from utils import set_file_readonly, is_file_readonly
+from utils import set_file_readonly, is_file_readonly, is_game_running
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -44,9 +46,9 @@ class DeadlockCompetitiveOptimizer(QWidget):
         # Resolution Row
         res_row = QHBoxLayout()
         self.resolutionWidth = QLineEdit()
-        self.resolutionWidth.setPlaceholderText("Width (1920)")
+        self.resolutionWidth.setPlaceholderText("Width (e.g. 1920)")
         self.resolutionHeight = QLineEdit()
-        self.resolutionHeight.setPlaceholderText("Height (1080)")
+        self.resolutionHeight.setPlaceholderText("Height (e.g. 1080)")
         res_row.addWidget(self.resolutionWidth)
         res_row.addWidget(self.resolutionHeight)
         form_layout.addRow("Resolution:", res_row)
@@ -72,8 +74,12 @@ class DeadlockCompetitiveOptimizer(QWidget):
         form_layout.addRow("Texture Quality:", self.textureQuality)
 
         # Read Only
-        self.readOnly = QCheckBox("Make video.txt read-only to fully save these settings")
+        self.readOnly = QCheckBox("Make video.txt read-only to ensure no overwrite?")
         form_layout.addRow(self.readOnly)
+
+        # Backups
+        self.backup = QCheckBox("Backup all files being optimized?")
+        form_layout.addRow(self.backup)
 
         main_layout.addLayout(form_layout)
 
@@ -140,6 +146,44 @@ class DeadlockCompetitiveOptimizer(QWidget):
             return False
 
         return True
+    
+    def save_backup(self, path):
+        backup_dir = f"{os.getcwd()}\\backups"
+
+        if not self.backup.isChecked(): 
+            return
+
+        if not os.path.isfile(path):
+            logging.critical(str(e))
+            self.show_error_popup(message=f"Failed to backup. Path {path} does not exist.")
+            return False
+
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+
+        filename = os.path.basename(path)
+        backup_path = os.path.join(backup_dir, filename)
+
+        # handle backup already exists
+        if os.path.exists(backup_path):
+            reply = QMessageBox.question(
+                "Backup Exists",
+                f"A backup file named '{filename}' already exists.\n"
+                "Do you want to overwrite it?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+            
+        try:
+            shutil.copy2(path, backup_path)
+            logging.info(f"Successfully saved backup to: {backup_path}")
+        except Exception as e:
+            logging.critical(str(e))
+            self.show_error_popup(message=f"Failed to save backup to {backup_path}. See console for more information.")
+            return False
+        
+        return True
 
     def get_vendor_device_ids(self, video_txt):
         """
@@ -164,6 +208,9 @@ class DeadlockCompetitiveOptimizer(QWidget):
         Returns false if writing the optimization failed
         """
         video_txt_path = f"{path}/game/citadel/cfg/video.txt"
+
+        # create a backup
+        if not self.save_backup(video_txt_path): return False
 
         # get id's
         try:
@@ -230,6 +277,9 @@ class DeadlockCompetitiveOptimizer(QWidget):
         """
         autoexec_cfg_path = f"{path}/game/citadel/cfg/autoexec.cfg"
 
+        # create a backup
+        if not self.save_backup(autoexec_cfg_path): return False
+
         # get autoexec content
         try:
             with open("configs/autoexec.txt", "r") as f:
@@ -261,6 +311,9 @@ class DeadlockCompetitiveOptimizer(QWidget):
         Returns false if writing the optimization failed
         """
         gameinfo_gi_path = f"{path}/game/citadel/gameinfo.gi"
+
+        # create a backup
+        if not self.save_backup(gameinfo_gi_path): return False
 
         # get gameinfo modification content
         try:
@@ -319,6 +372,16 @@ class DeadlockCompetitiveOptimizer(QWidget):
     def optimize(self):
         """Main function to handle all optimization operations"""
         path = self.path_input.text()
+
+        if is_game_running("deadlock.exe"):
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setText(f"Game is currently running.")
+            msg.setInformativeText("Please close the game to proceed.")
+            msg.setWindowTitle("Game Running")
+            msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg.exec()
+            return
 
         if not self.save_settings(): return
         if not self.write_video(path): return
