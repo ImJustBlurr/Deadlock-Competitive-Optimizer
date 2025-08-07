@@ -1,7 +1,4 @@
 - Display a bit of instructions in the console
-- Backup files
 - Add buttons in app to restore any of the files
 - Maybe add "// Deadlock Competitive Optimizer" comment in all files to indicate we have modified this file
-- Add logging functionality
-- Ensure game is closed before optimizing
 - gameinfo file will give problems if we want to update our optimized settings because we are checking for a 1:1 match
