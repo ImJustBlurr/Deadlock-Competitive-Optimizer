@@ -167,7 +167,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
 
         # get id's
         try:
-            self.settings["device_id"], self.settings["vendor_id"] = self.get_vendor_device_ids(video_txt_path)
+            self.settings["vendor_id"], self.settings["device_id"] = self.get_vendor_device_ids(video_txt_path)
         except Exception as e:
             logging.error(str(e))
             self.show_error_popup(message=f"Failed to get your Vendor/Device ID's from {video_txt_path}. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
@@ -213,18 +213,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
         else:
             logging.info(f"Successfully optimized {video_txt_path}")
 
-        # handle bak file
-        try:
-            set_file_readonly(f"{video_txt_path}.bak", readonly=False)
-            with open(f"{video_txt_path}.bak", "w") as f:
-                f.seek(0)
-                f.write(video_txt_contents)
-                f.truncate()
-            set_file_readonly(f"{video_txt_path}.bak")
-        except Exception as e:
-            logging.error(str(e))
-
-        # set file to readonly
+        # set file to readonly if desired
         try:
             if self.readOnly.isChecked():
                 set_file_readonly(video_txt_path, True)
