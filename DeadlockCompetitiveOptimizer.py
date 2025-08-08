@@ -193,7 +193,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
         backup_dir = f"{os.getcwd()}\\backups"
 
         if not self.backup.isChecked(): 
-            return
+            return True
 
         if not os.path.isfile(path):
             if create_temp:
