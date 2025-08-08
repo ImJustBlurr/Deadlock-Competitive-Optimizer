@@ -86,8 +86,11 @@ class DeadlockCompetitiveOptimizer(QWidget):
         # Optimize Button
         button_row = QHBoxLayout()
         button_row.addStretch()
+        restore_button = QPushButton("Restore")
         save_button = QPushButton("Optimize")
         save_button.clicked.connect(self.optimize)
+        restore_button.clicked.connect(self.restore_backup)
+        button_row.addWidget(restore_button)
         button_row.addWidget(save_button)
         main_layout.addLayout(button_row)
 
@@ -147,7 +150,45 @@ class DeadlockCompetitiveOptimizer(QWidget):
 
         return True
     
-    def save_backup(self, path):
+    def restore_backup(self):
+        """Allow the user to select a file and restore it"""
+        backup_dir = f"{os.getcwd()}\\backups"
+
+        file_dialog = QFileDialog()
+        file_dialog.setWindowTitle("Select a Backup File to Restore")
+        file_dialog.setDirectory(backup_dir)
+        file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        
+        if file_dialog.exec():
+            selected_files = file_dialog.selectedFiles()
+            if not selected_files:
+                return False
+            
+            backup_file_path = selected_files[0]
+            
+            backup_file_name = os.path.basename(backup_file_path)
+            original_path = backup_file_name.replace('_', os.sep)
+            original_path = original_path.replace('!', ':')
+            
+            if os.path.exists(original_path):
+                confirm = QMessageBox.question(
+                    None,
+                    "Are you sure you want to restore?",
+                    f"The file '{original_path}' will lose all optimizations. Do you want to restore it?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if confirm == QMessageBox.StandardButton.No:
+                    return False
+            
+            try:
+                os.makedirs(os.path.dirname(original_path), exist_ok=True)
+                shutil.copy2(backup_file_path, original_path)
+                logging.info(f"Restore complete backup restored to: {original_path}")
+            except Exception as e:
+                logging.critical(str(e))
+                self.show_error_popup(message="Failed to restore selected files. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
+    
+    def save_backup(self, path, create_temp=False):
         """If backup checkbox is checked then we save the given path to a backups folder"""
         backup_dir = f"{os.getcwd()}\\backups"
 
@@ -155,14 +196,20 @@ class DeadlockCompetitiveOptimizer(QWidget):
             return
 
         if not os.path.isfile(path):
-            logging.critical(f"Failed to backup. Path {path} does not exist.")
-            self.show_error_popup(message=f"Failed to backup. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
-            return False
+            if create_temp:
+                with open(path, 'w') as f:
+                    pass
+            else:
+                logging.critical(f"Failed to backup. Path {path} does not exist.")
+                self.show_error_popup(message=f"Failed to backup. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
+                return False
+        
 
         if not os.path.exists(backup_dir):
             os.makedirs(backup_dir)
 
-        filename = os.path.basename(path)
+        filename = re.sub(r'[<>"/\\|?*]', '_', path.strip(os.sep))
+        filename = filename.replace(":", "!")
         backup_path = os.path.join(backup_dir, filename)
 
         # handle backup already exists
@@ -182,7 +229,7 @@ class DeadlockCompetitiveOptimizer(QWidget):
             logging.info(f"Successfully saved backup to: {backup_path}")
         except Exception as e:
             logging.critical(str(e))
-            self.show_error_popup(message=f"Failed to save backup to {backup_path}. See console for more information.")
+            self.show_error_popup(message=f"Failed to save backup to {backup_path}.")
             return False
         
         return True
@@ -279,8 +326,8 @@ class DeadlockCompetitiveOptimizer(QWidget):
         """
         autoexec_cfg_path = f"{path}/game/citadel/cfg/autoexec.cfg"
 
-        # create a backup
-        if not self.save_backup(autoexec_cfg_path): return False
+        # create a backup if it exists
+        if not self.save_backup(autoexec_cfg_path, create_temp=True): return False
 
         # get autoexec content
         try:
