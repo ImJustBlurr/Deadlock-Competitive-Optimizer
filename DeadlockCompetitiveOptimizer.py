@@ -148,14 +148,15 @@ class DeadlockCompetitiveOptimizer(QWidget):
         return True
     
     def save_backup(self, path):
+        """If backup checkbox is checked then we save the given path to a backups folder"""
         backup_dir = f"{os.getcwd()}\\backups"
 
         if not self.backup.isChecked(): 
             return
 
         if not os.path.isfile(path):
-            logging.critical(str(e))
-            self.show_error_popup(message=f"Failed to backup. Path {path} does not exist.")
+            logging.critical(f"Failed to backup. Path {path} does not exist.")
+            self.show_error_popup(message=f"Failed to backup. Ensure you have the correct path and have launched Deadlock prior to optimizing.")
             return False
 
         if not os.path.exists(backup_dir):
@@ -167,13 +168,14 @@ class DeadlockCompetitiveOptimizer(QWidget):
         # handle backup already exists
         if os.path.exists(backup_path):
             reply = QMessageBox.question(
+                self,
                 "Backup Exists",
                 f"A backup file named '{filename}' already exists.\n"
                 "Do you want to overwrite it?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             if reply == QMessageBox.StandardButton.No:
-                return
+                return True
             
         try:
             shutil.copy2(path, backup_path)
